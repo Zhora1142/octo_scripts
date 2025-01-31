@@ -274,6 +274,70 @@ def restore_phantom(driver: webdriver.Chrome, wallet: Wallet, password, phantom_
         raise Exception(f'Can\'t import phantom: exception at {exc_tb.tb_lineno} ({e})')
 
 
+def get_sui_status(driver: webdriver.Chrome, sui_id):
+    driver.get(f'chrome-extension://{sui_id}/index.html')
+    WebDriverWait(driver, 15).until(ec.url_changes(f'chrome-extension://{sui_id}/index.html'))
+
+    url = driver.current_url
+
+    if 'Home/Tokens' in url:
+        return 'imported'
+    else:
+        return 'new'
+
+
+def import_sui(driver: webdriver.Chrome, wallet: Wallet, password, sui_id):
+    try:
+        driver.get(f'chrome-extension://{sui_id}/index.html')
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div/div/div/div/div[3]/div/div/div/div[2]/div[3]/button[2]'))).click()
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/div[1]'))).click()
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[2]/div[2]/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[1]/div/div/div/input')))
+
+        seed = wallet.seed_phrase.split(' ')
+
+        for i in range(12):
+            driver.find_element(By.XPATH, f'//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[2]/div[2]/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[{i + 1}]/div/div/div/input').send_keys(seed[i])
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[2]/div[2]/div/div/div[2]/div/div/div/div/div[2]/button'))).click()
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[3]/div[2]/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[1]/div/div/div/input'))).send_keys(password)
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[3]/div[2]/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[2]/div/div/div/input'))).send_keys(password)
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[3]/div[2]/div/div/div[2]/div/div/div/div/div[2]/button'))).click()
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[4]/div[2]/div/div/div[2]/div/div/div[3]/button'))).click()
+
+        WebDriverWait(driver, 15).until(ec.url_contains('Home/Tokens'))
+
+        driver.get('about:blank')
+
+        sleep(3)
+    except Exception as e:
+        exc_type, exc_value, exc_tb = exc_info()
+        raise Exception(f'Can\'t import sui: exception at {exc_tb.tb_lineno} ({e})')
+
+
+def restore_sui(driver: webdriver.Chrome, wallet: Wallet, password, sui_id):
+    try:
+        driver.get(f'chrome-extension://{sui_id}/index.html')
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '/html/body/div[6]/div/div[2]/div/div/div/div/div/div[2]/div[2]/button[2]'))).click()
+
+        before = driver.current_window_handle
+        driver.switch_to.new_window()
+        after = driver.current_window_handle
+        driver.switch_to.window(before)
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '/html/body/div[6]/div/div[2]/div/div/div/div/div/div/div[3]/button'))).click()
+
+        driver.switch_to.window(after)
+
+        import_sui(driver, wallet, password, sui_id)
+    except Exception as e:
+        exc_type, exc_value, exc_tb = exc_info()
+        raise Exception(f'Can\'t restore sui: exception at {exc_tb.tb_lineno} ({e})')
+
+
 def get_keplr_status(driver: webdriver.Chrome, keplr_id):
     driver.get(f'chrome-extension://{keplr_id}/popup.html')
 
@@ -366,7 +430,7 @@ def close_all_tabs(driver: webdriver.Chrome, number):
         raise Exception(f'Can\'t close tabs: {type(e)} at {exc_tb.tb_lineno}')
 
 
-def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, do_phantom, repeat, errors, profile_index):
+def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, do_phantom, do_sui, repeat, errors, profile_index):
     try:
         ws = octobrowser.run_profile(uuid)
         options = Options()
@@ -422,12 +486,27 @@ def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, 
 
             password = password if password else ''.join(sample(ascii_letters + digits, 15))
 
-            phantom_state = get_keplr_status(driver, phantom_id)
+            phantom_state = get_phantom_status(driver, phantom_id)
 
             if phantom_state == 'new':
                 import_phantom(driver, wallet, password, phantom_id)
             else:
                 restore_phantom(driver, wallet, password, phantom_id)
+
+        if do_sui:
+            sui_id = get_extensions(driver).get("ZavodSuiWallet")
+            if not sui_id:
+                raise Exception('Can\'t find sui id')
+
+            password = password if password else ''.join(sample(ascii_letters + digits, 15))
+
+            sui_state = get_sui_status(driver, sui_id)
+
+            if sui_state == 'new':
+                import_sui(driver, wallet, password, sui_id)
+            else:
+                raise Exception('Script can\'t restore SUI')
+                # restore_sui(driver, wallet, password, sui_id)
 
         octobrowser.close_profile(uuid)
 
@@ -462,6 +541,13 @@ def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, 
 
                     if phantom_state != 'imported':
                         import_phantom(driver, wallet, password, phantom_id)
+                        f = True
+
+                if do_sui:
+                    sui_state = get_sui_status(driver, sui_id)
+
+                    if sui_state != 'imported':
+                        import_sui(driver, wallet, password, sui_id)
                         f = True
 
                 if f:
