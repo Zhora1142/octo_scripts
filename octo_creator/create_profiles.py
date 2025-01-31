@@ -29,6 +29,17 @@ def create_profile(title, tag, proxy):
         }
     }
 
+    if config['settings']['storage'] == '1':
+        data['storage_options'] = {
+            "cookies": True,
+            "passwords": True,
+            "extensions": True,
+            "localstorage": True,
+            "history": True,
+            "bookmarks": True,
+            "serviceworkers": True
+        }
+
     s.post('https://app.octobrowser.net/api/v2/automation/profiles', json=data)
 
 
