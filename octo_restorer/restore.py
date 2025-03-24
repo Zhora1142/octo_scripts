@@ -58,7 +58,7 @@ def setup_profiles(uuid_list, wallet_list: List[Wallet]):
         threads = []
         for profile in group:
             uuid, wallet = profile
-            threads.append(Thread(target=worker, args=(uuid, wallet, bar, config_object.metamask_password, config_object.driver_version, config_object.do_metamask, config_object.do_keplr, config_object.do_phantom, config_object.repeat, errors, profile_index)))
+            threads.append(Thread(target=worker, args=(uuid, wallet, bar, config_object.metamask_password, config_object.driver_version, config_object.do_metamask, config_object.do_keplr, config_object.do_phantom, config_object.do_backpack, config_object.repeat, errors, profile_index)))
             profile_index += 1
         for thread in threads:
             thread.start()

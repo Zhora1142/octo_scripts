@@ -366,7 +366,50 @@ def close_all_tabs(driver: webdriver.Chrome, number):
         raise Exception(f'Can\'t close tabs: {type(e)} at {exc_tb.tb_lineno}')
 
 
-def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, do_phantom, repeat, errors, profile_index):
+def import_backpack(driver: webdriver.Chrome, wallet: Wallet, password, backpack_id):
+    driver.get(f'chrome-extension://{backpack_id}/options.html?onboarding=true')
+
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div/div[1]/div/div/div[3]/div/span[2]/button'))).click()
+
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/div/div[2]/div[3]/button[3]'))).click()
+
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/div/div[2]/span[1]/button'))).click()
+
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/div/div[2]/div/div[1]/div/div/input')))
+
+    seed = wallet.seed_phrase.split(' ')
+
+    for i in range(12):
+        driver.find_element(By.XPATH, f'//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/div/div[2]/div/div[{i + 1}]/div/div/input').send_keys(seed[i])
+
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/div/div[3]/span/button'))).click()
+
+    sleep(1)
+
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/div/div[2]/span/button'))).click()
+    sleep(1)
+    WebDriverWait(driver, 15).until(ec.presence_of_element_located((By.XPATH, '/html/body/div[2]/div/span/span/span/div/div/div[3]'))).click()
+    sleep(3)
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/div/div[3]/div/div[1]/div/div[1]'))).click()
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/div/div[4]/span/button'))).click()
+
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/form/div[2]/div[1]/span/span/input'))).send_keys(password)
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/form/div[2]/div[2]/span/span/input'))).send_keys(password)
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/form/div[3]/button/div[1]'))).click()
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div[1]/div[1]/div/form/div[3]/span/button'))).click()
+
+    WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="options"]/span/span/div/div/div/div/div/div[1]/div/div[2]/div/span/button')))
+
+    before = driver.current_window_handle
+    driver.switch_to.new_window()
+    new = driver.current_window_handle
+    driver.switch_to.window(before)
+    driver.close()
+    driver.switch_to.window(new)
+    driver.get('about:blank')
+
+
+def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, do_phantom, do_backpack, repeat, errors, profile_index):
     try:
         ws = octobrowser.run_profile(uuid)
         options = Options()
@@ -380,7 +423,7 @@ def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, 
         except:
             pass
 
-        number = do_metamask + do_keplr + do_phantom
+        number = do_metamask + do_keplr + do_phantom + do_backpack
 
         close_all_tabs(driver, number)
 
@@ -428,6 +471,15 @@ def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, 
                 import_phantom(driver, wallet, password, phantom_id)
             else:
                 restore_phantom(driver, wallet, password, phantom_id)
+
+        if do_backpack:
+            backpack_id = get_extensions(driver).get("ZavodBackpack")
+            if not backpack_id:
+                raise Exception('Can\'t find backpack id')
+
+            password = password if password else ''.join(sample(ascii_letters + digits, 15))
+
+            import_backpack(driver, wallet, password, backpack_id)
 
         octobrowser.close_profile(uuid)
 

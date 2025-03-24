@@ -15,10 +15,11 @@ class Config:
     do_metamask: int
     do_keplr: int
     do_phantom: int
+    do_backpack: int
 
     repeat: int
 
-    def __init__(self, api_token, first_profile, profiles_number, metamask_file, thread_number, tag_name, driver_version, metamask_password, do_metamask, do_keplr, do_phantom, repeat):
+    def __init__(self, api_token, first_profile, profiles_number, metamask_file, thread_number, tag_name, driver_version, metamask_password, do_metamask, do_keplr, do_phantom, do_backpack, repeat):
         self.api_token = api_token
         self.first_profile = int(first_profile)
         self.profiles_number = int(profiles_number)
@@ -30,4 +31,5 @@ class Config:
         self.do_metamask = int(do_metamask)
         self.do_keplr = int(do_keplr)
         self.do_phantom = int(do_phantom)
+        self.do_backpack = int(do_backpack)
         self.repeat = int(repeat)

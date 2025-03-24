@@ -21,13 +21,24 @@ def create_profile(title, tag, proxy):
             'os': 'win'
         },
         'proxy': {
-            'type': 'socks5',
+            'type': config['settings']['proxy_type'],
             'host': host,
             'port': port,
             'login': login,
             'password': password
         }
     }
+
+    if config['settings']['storage'] == '1':
+        data['storage_options'] = {
+            "cookies": True,
+            "passwords": True,
+            "extensions": True,
+            "localstorage": True,
+            "history": True,
+            "bookmarks": True,
+            "serviceworkers": True
+        }
 
     s.post('https://app.octobrowser.net/api/v2/automation/profiles', json=data)
 
