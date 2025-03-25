@@ -408,8 +408,70 @@ def import_backpack(driver: webdriver.Chrome, wallet: Wallet, password, backpack
     driver.switch_to.window(new)
     driver.get('about:blank')
 
+def get_sui_status(driver: webdriver.Chrome, sui_id):
+    driver.get(f'chrome-extension://{sui_id}/index.html')
+    WebDriverWait(driver, 15).until(ec.url_changes(f'chrome-extension://{sui_id}/index.html'))
 
-def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, do_phantom, do_backpack, repeat, errors, profile_index):
+    url = driver.current_url
+
+    if 'Home/Tokens' in url:
+        return 'imported'
+    else:
+        return 'new'
+
+
+def import_sui(driver: webdriver.Chrome, wallet: Wallet, password, sui_id):
+    try:
+        driver.get(f'chrome-extension://{sui_id}/index.html')
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div/div/div/div/div[3]/div/div/div/div[2]/div[3]/button[2]'))).click()
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[3]/div/div[2]/div/div/div/div/div[2]/div[1]'))).click()
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[2]/div[2]/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[1]/div/div/div/input')))
+
+        seed = wallet.seed_phrase.split(' ')
+
+        for i in range(12):
+            driver.find_element(By.XPATH, f'//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[2]/div[2]/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[{i + 1}]/div/div/div/input').send_keys(seed[i])
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[2]/div[2]/div/div/div[2]/div/div/div/div/div[2]/button'))).click()
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[3]/div[2]/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[1]/div/div/div/input'))).send_keys(password)
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[3]/div[2]/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[2]/div/div/div/input'))).send_keys(password)
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[3]/div[2]/div/div/div[2]/div/div/div/div/div[2]/button'))).click()
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '//*[@id="root"]/div/div/div/div/div[2]/div/div[2]/div/div[4]/div[2]/div/div/div[2]/div/div/div[3]/button'))).click()
+
+        WebDriverWait(driver, 15).until(ec.url_contains('Home/Tokens'))
+
+        driver.get('about:blank')
+
+        sleep(3)
+    except Exception as e:
+        exc_type, exc_value, exc_tb = exc_info()
+        raise Exception(f'Can\'t import sui: exception at {exc_tb.tb_lineno} ({e})')
+
+
+def restore_sui(driver: webdriver.Chrome, wallet: Wallet, password, sui_id):
+    try:
+        driver.get(f'chrome-extension://{sui_id}/index.html')
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '/html/body/div[6]/div/div[2]/div/div/div/div/div/div[2]/div[2]/button[2]'))).click()
+
+        before = driver.current_window_handle
+        driver.switch_to.new_window()
+        after = driver.current_window_handle
+        driver.switch_to.window(before)
+
+        WebDriverWait(driver, 15).until(ec.element_to_be_clickable((By.XPATH, '/html/body/div[6]/div/div[2]/div/div/div/div/div/div/div[3]/button'))).click()
+
+        driver.switch_to.window(after)
+
+        import_sui(driver, wallet, password, sui_id)
+    except Exception as e:
+        exc_type, exc_value, exc_tb = exc_info()
+        raise Exception(f'Can\'t restore sui: exception at {exc_tb.tb_lineno} ({e})')
+
+def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, do_phantom, do_backpack, do_sui, errors, profile_index):
     try:
         ws = octobrowser.run_profile(uuid)
         options = Options()
@@ -423,7 +485,7 @@ def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, 
         except:
             pass
 
-        number = do_metamask + do_keplr + do_phantom + do_backpack
+        number = do_metamask + do_keplr + do_phantom + do_backpack + do_sui
 
         close_all_tabs(driver, number)
 
@@ -481,47 +543,22 @@ def worker(uuid, wallet: Wallet, bar, password, version, do_metamask, do_keplr, 
 
             import_backpack(driver, wallet, password, backpack_id)
 
+        if do_sui:
+            sui_id = get_extensions(driver).get("ZavodSuiWallet")
+            if not sui_id:
+                raise Exception('Can\'t find Sui Wallet id')
+
+            password = password if password else ''.join(sample(ascii_letters + digits, 15))
+
+            sui_state = get_sui_status(driver, sui_id)
+
+            if sui_state == 'new':
+                import_sui(driver, wallet, password, sui_id)
+            else:
+                restore_sui(driver, wallet, password, sui_id)
+
+
         octobrowser.close_profile(uuid)
-
-        if repeat:
-            while 1:
-                ws = octobrowser.run_profile(uuid)
-                if not ws or isinstance(ws, Error):
-                    continue
-                options = Options()
-                options.add_experimental_option("debuggerAddress", f'127.0.0.1:{ws}')
-                service = Service(executable_path=ChromeDriverManager(version).install())
-                driver = webdriver.Chrome(options=options, service=service)
-
-                f = False
-
-                if do_metamask:
-                    metamask_state = get_metamask_status(driver, metamask_id)
-
-                    if metamask_state != 'locked':
-                        import_metamask(driver, wallet, password, metamask_id)
-                        f = True
-
-                if do_keplr:
-                    keplr_state = get_keplr_status(driver, keplr_id)
-
-                    if keplr_state != 'imported':
-                        import_metamask(driver, wallet, password, metamask_id)
-                        f = True
-
-                if do_phantom:
-                    phantom_state = get_phantom_status(driver, phantom_id)
-
-                    if phantom_state != 'imported':
-                        import_phantom(driver, wallet, password, phantom_id)
-                        f = True
-
-                if f:
-                    octobrowser.close_profile(uuid)
-                    continue
-
-                driver.get('about:blank')
-                break
     except Exception as e:
         errors.append(profile_index)
         print(e)
