@@ -1,10 +1,10 @@
 from entities import Wallet, Error
-from restore import config_object
+from restore import config_obj
 
 
 def read_wallets():
     try:
-        filename = config_object.metamask_file
+        filename = config_obj.metamask_file
 
         with open(filename, encoding='utf-8') as file:
             seeds_raw = file.read().split('\n')

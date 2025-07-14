@@ -1,7 +1,6 @@
 import requests
 from entities import Error
-from restore import config_object
-import os
+from restore import config_obj
 
 API_URL = 'https://app.octobrowser.net/api/v2/automation/'
 LOCAL_API_URL = 'http://localhost:58888/api/'
@@ -9,14 +8,14 @@ LOCAL_API_URL = 'http://localhost:58888/api/'
 
 def get_profiles():
     request_data = {
-        'search_tags': config_object.tag_name,
+        'search_tags': config_obj.tag_name,
         'fields': 'title',
         'ordering': 'created',
         'page': 0
     }
 
     headers = {
-        'X-Octo-Api-Token': config_object.api_token
+        'X-Octo-Api-Token': config_obj.api_token
     }
 
     result = []
@@ -53,7 +52,12 @@ def run_profile(uuid):
         if r.get('state') != 'STARTED':
             return Error('Profile launching error', r)
         else:
-            return r.get('debug_port')
+            port = r.get('debug_port')
+            try:
+                requests.put(f'http://127.0.0.1:{port}/json/new?about:blank')
+            except:
+                pass
+            return port
 
 def close_profile(uuid):
     request_data = {

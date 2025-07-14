@@ -65,7 +65,7 @@ def main():
     else:
         batches = range(int(config['settings']['number']))
 
-    batches = [batches[i:i + 60] for i in range(0, len(batches), 60)]
+    batches = [batches[i:i + 200] for i in range(0, len(batches), 200)]
 
     for batch in batches:
         print(f'Создаём {len(batch)} профилей')
